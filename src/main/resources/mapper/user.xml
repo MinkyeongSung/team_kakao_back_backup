@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+
+<mapper namespace="com.example.team3_kakaotalk.user.UserMBRepository">
+
+	<!-- 친구 탭 메인 화면 -->
+	<select id = "findByFriendTepMain" resultType = "com.example.team3_kakaotalk.user.UserResponse$FriendTepMainResponseDTO">
+		select
+			pt.*,
+			ut.*,
+			case
+				when day(ut.birthdate) = day(current_date()) then '오늘 생일 친구' else '일반 친구'
+		end as is_birthday,
+			max(ft.is_blocked) as is_blocked
+		from
+			user_tb ut
+		inner join
+			profile_tb pt on pt.user_id = ut.id
+        inner join
+			friend_tb ft on (ft.user_id1 = ut.id or ft.user_id2 = ut.id)
+		where ut.id in (
+			select
+				case
+					when user_id1 = #{id} then user_id2 else user_id1
+				end as 친구
+			from
+				friend_tb
+			where (user_id1 = #{id} or user_id2 = #{id}))
+         group by ut.id
+         having max(ft.is_blocked) = false
+	</select>
+
+	<!-- 나의 프로필 상세보기 -->
+	<select id="findByMyProfileDetail" resultType="com.example.team3_kakaotalk.user.UserResponse$MyProfileDetailResponseDTO">
+		select ut.id, ut.nickname, pt.back_image, pt.profile_image, pt.status_message
+		from user_tb as ut
+		inner join profile_tb as pt
+		on ut.profile_id = pt.id
+		where ut.id = #{id}
+	</select>
+
+	<!-- 친구 프로필 상세보기 -->
+	<select id="findByFriendProfileDetail" resultType="com.example.team3_kakaotalk.user.UserResponse$FriendProfileDetailResponseDTO">
+		select ut.Id, ut.nickname, pt.profile_image, pt.back_image, pt.status_message
+		from user_tb as ut
+    	inner join profile_tb as pt
+		on ut.profile_id = pt.id
+		where ut.id = #{id}
+	</select>
+	
+	<!-- 나의 프로필 수정(이름) -->
+	<update id="myProfileNicknameUpdate">
+		update user_tb as ut
+		set ut.nickname=#{nickname}
+		where ut.id=#{id}
+	</update>
+
+	<!-- TODO 은지누나 : 백이미지 추가하기 -->
+	<!-- 나의 프로필 수정(상태 메세지, 프로필 이미지, 배경 이미지) -->
+	<update id="myProfileSmessageAndPimageAndBimageUpdate">
+		update profile_tb as pt
+		set pt.status_message=#{statusMessage},
+		pt.profile_image=#{profileImage},
+		pt.back_image=#{backImage}
+		where pt.user_id=#{id}
+	</update>
+
+
+	<!-- 나의 프로필 수정 단일 조회 -->
+	<select id="findByMyProfile" resultType="com.example.team3_kakaotalk.user.UserResponse$MyProfileUpdateResponseDTO">
+		select ut.id, ut.nickname, pt.status_message, pt.profile_image, pt.back_image
+		from user_tb as ut
+				 inner join profile_tb as pt on ut.profile_id = pt.id
+		where ut.id=#{id}
+	</select>
+
+	<!-- 나의 프로필 삭제(프로필 이미지) -->
+	<update id="myProfileImageDelete">
+		update profile_tb
+		set profile_image=null
+		where user_id=#{id}
+	</update>
+
+	<!-- 나의 프로필 삭제(배경 이미지) -->
+	<update id="myProfileBackImageDelete">
+		update profile_tb
+		set back_image=null
+		where user_id=#{id}
+	</update>
+
+	<!-- 연락처로 친구 추가 -->
+	<insert id="phoneNumFriendAdd">
+		insert into friend_tb(user_id1, user_id2, is_blocked)
+		values (#{id}, (select id from user_tb where phone_num=#{phoneNum}), false)
+	</insert>
+
+	<!-- 이메일로 친구 추가 -->
+	<insert id="emailFriendAdd">
+		insert into friend_tb(user_id1, user_id2, is_blocked)
+		values (#{id}, (select id from user_tb where email=#{email}), false)
+	</insert>
+
+	<!-- 전화번호 단일 조회 -->
+	<select id="findByPhoneNum" resultType="java.lang.String">
+		select phone_num
+		from user_tb
+		where phone_num=#{phoneNum}
+	</select>
+
+	<!-- 이메일 단일 조회 -->
+	<select id="findByEmail" resultType="java.lang.String">
+		select email
+		from user_tb
+		where email=#{email}
+	</select>
+
+	<!-- 연락처로 친구 추가(이미 친구등록 되었는지 확인) -->
+	<select id="findByPhoneNumFriendAdd" resultType="com.example.team3_kakaotalk.user.UserResponse$PhoneNumFriendAddResponseDTO">
+		select ft.user_id1, ft.user_id2, ut.phone_num
+		from user_tb as ut
+				 join friend_tb as ft
+					  on ft.user_id2 = ut.id
+		where ft.user_id1=#{id} and ut.phone_num=#{phoneNum}
+	</select>
+
+	<!-- 이메일로 친구 추가(이미 친구등록 되었는지 확인) -->
+	<select id="findByEmailFriendAdd" resultType="com.example.team3_kakaotalk.user.UserResponse$EmailFriendAddResponseDTO">
+		select ft.user_id1, ft.user_id2, ut.email
+		from user_tb as ut
+				 join friend_tb as ft
+					  on ft.user_id2 = ut.id
+		where ft.user_id1=#{id} and ut.email=#{email}
+	</select>
+
+	<!-- 친구 차단 -->
+	<update id="friendDeleteUpdate">
+		update friend_tb set is_blocked=true where user_id2=#{id}
+	</update>
+
+	<!-- 차단 친구 찾기 -->
+	<select id="findByIsBlockedFalse">
+		select * from friend_tb where is_blocked = false
+	</select>
+
+	<!-- 친구 검색 -->
+	<select id="findByFriend" resultType="com.example.team3_kakaotalk.user.UserResponse$SearchFriendResponseDTO">
+		select ut.id, ut.nickname, ut.phone_num, ut.birthdate, pt.status_message, pt.profile_image, pt.back_image
+		from user_tb as ut
+				 inner join friend_tb as ft on (ft.user_id1 = ut.id or ft.user_id2 = ut.id)
+				 inner join profile_tb as pt on ut.profile_id = pt.id
+		where ft.is_blocked not in(true)
+			and ut.nickname like concat('%', #{keyword}, '%') or ut.phone_num like concat('%', #{keyword}, '%')
+			and ft.user_id1=#{sessionUserId} or ft.user_id2=#{sessionUserId}
+		order by ut.nickname asc
+	</select>
+
+	<!-- 친구 목록 조회 -->
+	<select id="findByFriendCount" resultType="Integer">
+		select count(ft.id)
+		from friend_tb as ft
+				 join user_tb as ut on (ft.user_id1 = ut.id or ft.user_id2 = ut.id)
+		where ut.id=#{id}
+	</select>
+
+</mapper>
